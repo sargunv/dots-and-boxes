@@ -1,0 +1,5 @@
+node_modules/
+dist/
+.dprint/
+*.local
+.DS_Store

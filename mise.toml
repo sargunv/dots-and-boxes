@@ -1,0 +1,42 @@
+[settings]
+experimental = true
+pin = true
+minimum_release_age = "3d"
+lockfile = true
+
+[tools]
+"aqua:dprint/dprint" = "0.55.2"
+"aqua:jdx/hk" = "1.54.1"
+"aqua:pnpm/pnpm" = "11.21.0"
+"core:node" = "26.7.0"
+
+[deps.pnpm]
+auto = true
+
+[hooks]
+postinstall = ["hk install --mise"]
+
+[tasks.check]
+run = "hk check --all"
+
+[tasks.fix]
+run = "hk fix --all"
+
+[tasks.generate]
+description = "Generate the TanStack Router route tree"
+sources = ["src/routes/**/*.tsx"]
+outputs = ["src/routeTree.gen.ts"]
+run = "pnpm exec tsr generate"
+
+[tasks.dev]
+description = "Start the Vite dev server"
+run = "pnpm exec vp dev"
+
+[tasks.build]
+description = "Build for production"
+depends = ["generate"]
+run = "pnpm exec vp build"
+
+[tasks.test]
+description = "Run tests"
+run = "pnpm exec vp test"

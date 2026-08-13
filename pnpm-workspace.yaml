@@ -1,0 +1,9 @@
+minimumReleaseAge: 4320 # 3-day release cooldown
+onlyBuiltDependencies:
+  - esbuild
+overrides:
+  vite: npm:@voidzero-dev/vite-plus-core@0.2.8
+  vitest: 4.1.10
+peerDependencyRules:
+  allowedVersions:
+    vite: 0.2.8

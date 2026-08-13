@@ -1,0 +1,18 @@
+amends "package://github.com/jdx/hk/releases/download/v1.54.1/hk@1.54.1#/Config.pkl"
+import "package://github.com/jdx/hk/releases/download/v1.54.1/hk@1.54.1#/Builtins.pkl"
+
+local lintSteps = new Mapping<String, Step> {
+  ["dprint"] = (Builtins.dprint)
+  ["vp-check"] {
+    glob = List("**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx")
+    workspace_indicator = "vite.config.ts"
+    check = "cd {{workspace}} && pnpm exec vp check --no-fmt"
+    fix = "cd {{workspace}} && pnpm exec vp check --no-fmt --fix"
+  }
+}
+
+hooks {
+  ["pre-commit"] { fix = true; stash = "git"; steps { ...lintSteps } }
+  ["check"]      { steps { ...lintSteps } }
+  ["fix"]        { fix = true; steps { ...lintSteps } }
+}
