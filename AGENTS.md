@@ -9,6 +9,9 @@ A Dots and Boxes SPA.
 - `src/ui/` — reusable primitives
 - `src/lib/` — queries, mutations, and hooks
 - `src/lib/game.ts` — pure game engine (state, moves, scoring)
+- `src/lib/topology.ts` — board topologies (square / triangular / hexagonal
+  grids, American / Swedish / Icelandic start styles) as vertex-edge-cell graphs
+  built from cell polygons
 - `src/lib/ai.ts` — minimax AI (iterative deepening, alpha-beta, 3s budget), run
   in a Web Worker via `ai-client.ts` / `ai.worker.ts` / `ai-protocol.ts`
 

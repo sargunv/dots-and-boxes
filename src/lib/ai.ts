@@ -1,11 +1,6 @@
-import {
-  applyMove,
-  boxEdgeCount,
-  boxesForEdge,
-  isGameOver,
-  legalMoves,
-} from "./game.ts";
+import { applyMove, cellEdgeCount, isGameOver, legalMoves } from "./game.ts";
 import type { GameState } from "./game.ts";
+import { at } from "./topology.ts";
 
 export type Difficulty = "easy" | "medium" | "hard";
 
@@ -201,10 +196,11 @@ function orderMoves(state: GameState, moves: readonly number[]): number[] {
 function movePriority(state: GameState, move: number): number {
   let completes = 0;
   let givesAway = 0;
-  for (const box of boxesForEdge(state.rows, state.cols, move)) {
-    const drawn = boxEdgeCount(state, box);
-    if (drawn === 3) completes += 1;
-    else if (drawn === 2) givesAway += 1;
+  for (const cell of at(state.topology.edgeCells, move)) {
+    const sides = at(state.topology.cells, cell).length;
+    const drawn = cellEdgeCount(state.topology, state.edges, cell);
+    if (drawn === sides - 1) completes += 1;
+    else if (drawn === sides - 2) givesAway += 1;
   }
   if (completes > 0) return 2 + completes;
   if (givesAway > 0) return 0;

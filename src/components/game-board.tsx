@@ -1,8 +1,8 @@
-import { edgeCount, edgePosition } from "../lib/game.ts";
 import type { GameState, Player } from "../lib/game.ts";
+import { at } from "../lib/topology.ts";
 import { cx } from "../ui/cx.ts";
 
-const SPACING = 64;
+const SCALE = 64;
 const PADDING = 32;
 
 interface GameBoardProps {
@@ -19,11 +19,14 @@ export function GameBoard({
   lastMove,
   onEdgeClick,
 }: GameBoardProps) {
-  const { rows, cols } = game;
-  const width = 2 * PADDING + cols * SPACING;
-  const height = 2 * PADDING + rows * SPACING;
-  const x = (c: number) => PADDING + c * SPACING;
-  const y = (r: number) => PADDING + r * SPACING;
+  const { topology } = game;
+  const { minX, minY, maxX, maxY } = topology.bounds;
+  const width = (maxX - minX) * SCALE + 2 * PADDING;
+  const height = (maxY - minY) * SCALE + 2 * PADDING;
+  const x = (vertex: number) =>
+    PADDING + (at(topology.vertices, vertex).x - minX) * SCALE;
+  const y = (vertex: number) =>
+    PADDING + (at(topology.vertices, vertex).y - minY) * SCALE;
 
   return (
     <svg
@@ -32,36 +35,37 @@ export function GameBoard({
       role="img"
       aria-label="Dots and boxes board"
     >
-      {/* Claimed boxes */}
-      {game.boxes.map((owner, box) => {
+      {/* Claimed cells */}
+      {game.cells.map((owner, cell) => {
         if (owner === null) return null;
-        const r = Math.floor(box / cols);
-        const c = box % cols;
+        const ring = at(topology.cellPolygons, cell);
+        // Shrink the polygon toward its centroid so adjacent claimed cells
+        // keep a visible gap between them.
+        const cx0 = ring.reduce((sum, v) => sum + x(v), 0) / ring.length;
+        const cy0 = ring.reduce((sum, v) => sum + y(v), 0) / ring.length;
+        const points = ring
+          .map((v) => {
+            const px = cx0 + (x(v) - cx0) * 0.82;
+            const py = cy0 + (y(v) - cy0) * 0.82;
+            return `${px},${py}`;
+          })
+          .join(" ");
         return (
-          <rect
-            key={`box-${box}`}
-            x={x(c) + 8}
-            y={y(r) + 8}
-            width={SPACING - 16}
-            height={SPACING - 16}
-            rx={10}
+          <polygon
+            key={`cell-${cell}`}
+            points={points}
             className={ownerClass(owner, "fill")}
           />
         );
       })}
 
       {/* Edges */}
-      {Array.from({ length: edgeCount(rows, cols) }, (_, edge) => {
-        const { r, c, horizontal } = edgePosition(rows, cols, edge);
-        const points = {
-          x1: x(c),
-          y1: y(r),
-          x2: x(horizontal ? c + 1 : c),
-          y2: y(horizontal ? r : r + 1),
-        };
+      {topology.edges.map(([a, b], edge) => {
+        const points = { x1: x(a), y1: y(a), x2: x(b), y2: y(b) };
+        const drawn = game.edges[edge] === true;
         const owner = game.edgeOwners[edge] ?? null;
 
-        if (owner !== null) {
+        if (drawn) {
           return (
             <g key={`edge-${edge}`}>
               {edge === lastMove && (
@@ -74,7 +78,11 @@ export function GameBoard({
               )}
               <line
                 {...points}
-                className={ownerClass(owner, "stroke")}
+                className={
+                  owner === null
+                    ? "stroke-base-content/40"
+                    : ownerClass(owner, "stroke")
+                }
                 strokeWidth={6}
                 strokeLinecap="round"
               />
@@ -106,29 +114,28 @@ export function GameBoard({
               />
             )}
             {/* Fat invisible hit area */}
-            <line {...points} className="stroke-transparent" strokeWidth={28} />
+            <line {...points} className="stroke-transparent" strokeWidth={24} />
           </g>
         );
       })}
 
       {/* Dots */}
-      {Array.from({ length: rows + 1 }, (_, r) =>
-        Array.from({ length: cols + 1 }, (_, c) => (
-          <circle
-            key={`dot-${r}-${c}`}
-            cx={x(c)}
-            cy={y(r)}
-            r={5}
-            className="fill-base-content"
-          />
-        )),
-      )}
+      {topology.vertices.map((_, vertex) => (
+        <circle
+          key={`dot-${vertex}`}
+          cx={x(vertex)}
+          cy={y(vertex)}
+          r={5}
+          className="fill-base-content"
+        />
+      ))}
     </svg>
   );
 }
 
 function ownerClass(owner: Player, kind: "fill" | "stroke"): string {
-  if (owner === "human")
+  if (owner === "human") {
     return kind === "fill" ? "fill-primary/25" : "stroke-primary";
+  }
   return kind === "fill" ? "fill-secondary/25" : "stroke-secondary";
 }

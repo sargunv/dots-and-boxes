@@ -4,17 +4,70 @@ import { requestMove } from "../lib/ai-client.ts";
 import type { Difficulty } from "../lib/ai.ts";
 import { applyMove, createGame, gameResult, isGameOver } from "../lib/game.ts";
 import type { GameState } from "../lib/game.ts";
+import {
+  at,
+  buildTopology,
+  hexagonPolygons,
+  preDrawnEdges,
+  squarePolygons,
+  triangularPolygons,
+} from "../lib/topology.ts";
+import type { BoardStyle, Topology } from "../lib/topology.ts";
 import { cx } from "../ui/cx.ts";
 import { GameBoard } from "./game-board.tsx";
 
-const BOARD_SIZES: readonly number[] = [2, 3, 4, 5];
+type GridKind = "square" | "triangular" | "hexagonal";
+
+interface GridOption {
+  readonly value: GridKind;
+  readonly label: string;
+  readonly sizes: readonly number[];
+  readonly defaultSize: number;
+}
+
+const GRIDS: readonly GridOption[] = [
+  { value: "square", label: "Square", sizes: [2, 3, 4, 5], defaultSize: 3 },
+  {
+    value: "triangular",
+    label: "Triangular",
+    sizes: [3, 4, 5, 6],
+    defaultSize: 4,
+  },
+  {
+    value: "hexagonal",
+    label: "Hexagonal",
+    sizes: [2, 3, 4],
+    defaultSize: 3,
+  },
+];
+
+const STYLES: readonly { value: BoardStyle; label: string }[] = [
+  { value: "american", label: "American (blank)" },
+  { value: "swedish", label: "Swedish (border drawn)" },
+  { value: "icelandic", label: "Icelandic (left + bottom drawn)" },
+];
+
 const DIFFICULTIES: readonly Difficulty[] = ["easy", "medium", "hard"];
 const COMPUTER_MOVE_DELAY_MS = 450;
 
+function buildBoard(grid: GridKind, size: number): Topology {
+  if (grid === "triangular") return buildTopology(triangularPolygons(size));
+  if (grid === "hexagonal") return buildTopology(hexagonPolygons(size, size));
+  return buildTopology(squarePolygons(size, size));
+}
+
+function gridOption(grid: GridKind): GridOption {
+  return GRIDS.find((option) => option.value === grid) ?? at(GRIDS, 0);
+}
+
 export function Game() {
+  const [grid, setGrid] = useState<GridKind>("square");
   const [size, setSize] = useState(3);
+  const [style, setStyle] = useState<BoardStyle>("american");
   const [difficulty, setDifficulty] = useState<Difficulty>("medium");
-  const [game, setGame] = useState<GameState>(() => createGame(3, 3));
+  const [game, setGame] = useState<GameState>(() =>
+    createGame(buildBoard("square", 3)),
+  );
   const [lastMove, setLastMove] = useState<number | null>(null);
 
   const over = isGameOver(game);
@@ -47,9 +100,21 @@ export function Game() {
     setLastMove(edge);
   }
 
-  function startNewGame(nextSize: number) {
+  function startNewGame(
+    nextGrid: GridKind,
+    nextSize: number,
+    nextStyle: BoardStyle,
+  ) {
+    // Board styles are named for the classic square game; other grids
+    // always start blank.
+    const effectiveStyle = nextGrid === "square" ? nextStyle : "american";
+    setGrid(nextGrid);
     setSize(nextSize);
-    setGame(createGame(nextSize, nextSize));
+    setStyle(effectiveStyle);
+    const topology = buildBoard(nextGrid, nextSize);
+    setGame(
+      createGame(topology, "human", preDrawnEdges(topology, effectiveStyle)),
+    );
     setLastMove(null);
   }
 
@@ -90,15 +155,57 @@ export function Game() {
 
           <div className="flex flex-wrap items-end justify-center gap-3">
             <label className="form-control">
-              <span className="label-text mb-1">Board size</span>
+              <span className="label-text mb-1">Grid</span>
+              <select
+                className="select select-bordered select-sm"
+                value={grid}
+                onChange={(event) => {
+                  const nextGrid = parseGrid(event.target.value);
+                  startNewGame(
+                    nextGrid,
+                    gridOption(nextGrid).defaultSize,
+                    style,
+                  );
+                }}
+              >
+                {GRIDS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="form-control">
+              <span className="label-text mb-1">Size</span>
               <select
                 className="select select-bordered select-sm"
                 value={size}
-                onChange={(event) => startNewGame(Number(event.target.value))}
+                onChange={(event) =>
+                  startNewGame(grid, Number(event.target.value), style)
+                }
               >
-                {BOARD_SIZES.map((option) => (
+                {gridOption(grid).sizes.map((option) => (
                   <option key={option} value={option}>
-                    {option} × {option}
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="form-control">
+              <span className="label-text mb-1">Start</span>
+              <select
+                className="select select-bordered select-sm"
+                value={style}
+                disabled={grid !== "square"}
+                onChange={(event) =>
+                  startNewGame(grid, size, parseStyle(event.target.value))
+                }
+              >
+                {STYLES.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
                   </option>
                 ))}
               </select>
@@ -125,7 +232,7 @@ export function Game() {
             <button
               type="button"
               className="btn btn-primary btn-sm"
-              onClick={() => startNewGame(size)}
+              onClick={() => startNewGame(grid, size, style)}
             >
               New game
             </button>
@@ -146,6 +253,14 @@ function statusText(
   return computerTurn
     ? "Computer is thinking…"
     : "Your turn — draw a line between two dots.";
+}
+
+function parseGrid(value: string): GridKind {
+  return value === "triangular" || value === "hexagonal" ? value : "square";
+}
+
+function parseStyle(value: string): BoardStyle {
+  return value === "swedish" || value === "icelandic" ? value : "american";
 }
 
 function parseDifficulty(value: string): Difficulty {

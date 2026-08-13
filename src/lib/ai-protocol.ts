@@ -43,16 +43,15 @@ function isPlayer(value: unknown): value is Player {
 function isGameState(value: unknown): value is GameState {
   if (typeof value !== "object" || value === null) return false;
   return (
-    "rows" in value &&
-    typeof value.rows === "number" &&
-    "cols" in value &&
-    typeof value.cols === "number" &&
+    "topology" in value &&
+    typeof value.topology === "object" &&
+    value.topology !== null &&
     "edges" in value &&
     Array.isArray(value.edges) &&
     "edgeOwners" in value &&
     Array.isArray(value.edgeOwners) &&
-    "boxes" in value &&
-    Array.isArray(value.boxes) &&
+    "cells" in value &&
+    Array.isArray(value.cells) &&
     "currentPlayer" in value &&
     isPlayer(value.currentPlayer) &&
     "scores" in value &&
