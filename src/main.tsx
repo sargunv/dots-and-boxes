@@ -12,6 +12,8 @@ const router = createRouter({
   routeTree,
   context: { queryClient },
   defaultPreloadStaleTime: 0,
+  // Match the Vite base path (e.g. "/dots-and-boxes/" on GitHub Pages).
+  basepath: import.meta.env.BASE_URL.replace(/\/$/, "") || "/",
 });
 
 declare module "@tanstack/react-router" {

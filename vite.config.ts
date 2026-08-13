@@ -4,6 +4,8 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite-plus";
 
 export default defineConfig({
+  // GitHub Pages serves the site under /<repo>/; local dev stays at /.
+  base: process.env["BASE_PATH"] ?? "/",
   plugins: [
     TanStackRouterVite({
       target: "react",
