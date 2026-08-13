@@ -1,3 +1,6 @@
+import { useState } from "react";
+
+import { cellEdgeCount } from "../lib/game.ts";
 import type { GameState, Player } from "../lib/game.ts";
 import { at } from "../lib/topology.ts";
 import { cx } from "../ui/cx.ts";
@@ -28,6 +31,45 @@ export function GameBoard({
   const y = (vertex: number) =>
     PADDING + (at(topology.vertices, vertex).y - minY) * SCALE;
 
+  const [hovered, setHovered] = useState<number | null>(null);
+
+  // Cells the hovered edge would complete, shown as a faint preview.
+  const previewCells = new Set<number>();
+  if (interactive && hovered !== null) {
+    for (const cell of at(topology.edgeCells, hovered)) {
+      const sides = at(topology.cells, cell).length;
+      const unclaimed = game.cells[cell] === null;
+      if (
+        unclaimed &&
+        cellEdgeCount(topology, game.edges, cell) === sides - 1
+      ) {
+        previewCells.add(cell);
+      }
+    }
+  }
+
+  /** Cell polygon (shrunk toward its bbox center) plus center and size. */
+  function cellGeometry(cell: number) {
+    const ring = at(topology.cellPolygons, cell);
+    const px = ring.map(x);
+    const py = ring.map(y);
+    const minPx = Math.min(...px);
+    const maxPx = Math.max(...px);
+    const minPy = Math.min(...py);
+    const maxPy = Math.max(...py);
+    const cx0 = (minPx + maxPx) / 2;
+    const cy0 = (minPy + maxPy) / 2;
+    const points = ring
+      .map((v) => `${cx0 + (x(v) - cx0) * 0.82},${cy0 + (y(v) - cy0) * 0.82}`)
+      .join(" ");
+    return {
+      points,
+      centerX: cx0,
+      centerY: cy0,
+      size: Math.min(maxPx - minPx, maxPy - minPy),
+    };
+  }
+
   return (
     <svg
       viewBox={`0 0 ${width} ${height}`}
@@ -35,27 +77,42 @@ export function GameBoard({
       role="img"
       aria-label="Dots and boxes board"
     >
-      {/* Claimed cells */}
+      {/* Preview of cells the hovered edge would claim */}
+      {[...previewCells].map((cell) => (
+        <polygon
+          key={`preview-${cell}`}
+          points={cellGeometry(cell).points}
+          className="fill-primary/15 pointer-events-none"
+        />
+      ))}
+
+      {/* Claimed cells: ink wash plus a stamped handwritten initial */}
       {game.cells.map((owner, cell) => {
         if (owner === null) return null;
-        const ring = at(topology.cellPolygons, cell);
-        // Shrink the polygon toward its centroid so adjacent claimed cells
-        // keep a visible gap between them.
-        const cx0 = ring.reduce((sum, v) => sum + x(v), 0) / ring.length;
-        const cy0 = ring.reduce((sum, v) => sum + y(v), 0) / ring.length;
-        const points = ring
-          .map((v) => {
-            const px = cx0 + (x(v) - cx0) * 0.82;
-            const py = cy0 + (y(v) - cy0) * 0.82;
-            return `${px},${py}`;
-          })
-          .join(" ");
+        const { points, centerX, centerY, size } = cellGeometry(cell);
         return (
-          <polygon
-            key={`cell-${cell}`}
-            points={points}
-            className={ownerClass(owner, "fill")}
-          />
+          <g key={`cell-${cell}`}>
+            <polygon points={points} className={ownerClass(owner, "fill")} />
+            <text
+              x={centerX}
+              y={centerY}
+              textAnchor="middle"
+              dominantBaseline="central"
+              className={cx(
+                "anim-stamp font-display pointer-events-none select-none",
+                owner === "human" ? "fill-primary" : "fill-secondary",
+              )}
+              style={{
+                fontSize: size * 0.55,
+                fontWeight: 700,
+                rotate: `${((cell * 37) % 9) - 4}deg`,
+                transformBox: "fill-box",
+                transformOrigin: "center",
+              }}
+            >
+              {owner === "human" ? "Y" : "C"}
+            </text>
+          </g>
         );
       })}
 
@@ -71,17 +128,18 @@ export function GameBoard({
               {edge === lastMove && (
                 <line
                   {...points}
-                  className="stroke-accent/40"
-                  strokeWidth={14}
+                  className="stroke-accent/35"
+                  strokeWidth={10}
                   strokeLinecap="round"
                 />
               )}
               <line
                 {...points}
+                pathLength={1}
                 className={
                   owner === null
                     ? "stroke-base-content/40"
-                    : ownerClass(owner, "stroke")
+                    : cx(ownerClass(owner, "stroke"), "anim-draw-in")
                 }
                 strokeWidth={6}
                 strokeLinecap="round"
@@ -94,6 +152,8 @@ export function GameBoard({
           <g
             key={`edge-${edge}`}
             className={cx(interactive && "group cursor-pointer")}
+            onMouseEnter={() => setHovered(edge)}
+            onMouseLeave={() => setHovered(null)}
             onClick={() => {
               if (interactive) onEdgeClick(edge);
             }}

@@ -21,7 +21,7 @@ export default defineConfig({
     tailwindcss(),
   ],
   lint: {
-    ignorePatterns: ["dist/**", "src/routeTree.gen.ts"],
+    ignorePatterns: ["dist/**", "src/routeTree.gen.ts", "scripts/**"],
     plugins: [
       "eslint",
       "typescript",
